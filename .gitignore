@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Generated files
+*.docx
+*.pdf
+Khader_Shareef_*.pdf
+Khader_Shareef_*.docx
+
+# Personal data
+job_description.txt
+job_details.py
