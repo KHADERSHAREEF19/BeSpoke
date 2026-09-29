@@ -1,5 +1,6 @@
+<img src="bespoke_logo.png" alt="BeSpoke Logo" width="499">
 
-# 🎯 BeSpoke: Resume Tailoring System
+## 🎯 BeSpoke: Resume Tailoring System
 
 > Automatically tailor your resume and generate cover letters for job applications with ATS keyword matching.
 
