@@ -11,7 +11,3 @@ venv/
 *.pdf
 Khader_Shareef_*.pdf
 Khader_Shareef_*.docx
-
-# Personal data
-job_description.txt
-job_details.py
