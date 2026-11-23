@@ -30,14 +30,17 @@ def main():
         "why_company": WHY_COMPANY,
     }
 
-    out_dir = tempfile.mkdtemp(prefix="bespoke_letter_")
-    result = run_generation(profile, jd_text, job, out_dir,
+    result = run_generation(profile, jd_text, job,
                             cover_letter=True, uae_cover_letter=True)
 
+    out_dir = tempfile.mkdtemp(prefix="bespoke_letter_")
     print(f"Cover letter generated for {COMPANY} — {ROLE}")
     for item in result["files"]:
         if "Cover_Letter" in item["filename"]:
-            print(f"  • {item['label']} → {os.path.join(out_dir, item['filename'])}")
+            path = os.path.join(out_dir, item["filename"])
+            with open(path, "wb") as handle:
+                handle.write(item["bytes"])
+            print(f"  • {item['label']} → {path}")
     print("\nRead it fully before sending, and edit any sentence that doesn't sound like you.")
 
 

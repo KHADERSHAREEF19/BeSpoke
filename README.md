@@ -56,6 +56,23 @@ too (concepts are auto-tagged from the same dictionary).
 
 ---
 
+## ☁️ Deploy on Vercel
+
+The app is **stateless**: documents are generated in memory and delivered as
+data-URL downloads, so nothing needs writable disk — which makes Vercel's
+read-only serverless filesystem a perfect fit.
+
+- Entry point: `api/index.py` (WSGI → Flask)
+- Config: `vercel.json` (`@vercel/python`, all routes → the function)
+- Dependencies auto-install from `requirements.txt`
+
+One caveat: on Vercel the **Save profile** button can't write `profile.json`
+(read-only storage). Your details stay in the editor and are sent along with
+every *Tailor* request automatically, so uploads/edits keep working — only
+cross-visit persistence needs local storage or a database add-on.
+
+---
+
 ## 🖥️ Command line (optional)
 
 ```bash

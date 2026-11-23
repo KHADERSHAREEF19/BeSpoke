@@ -52,6 +52,7 @@
 <section id="section-job" class="card">
   <div class="card-head"><h2>2 · Job description</h2></div>
   <form method="post" action="{{ url_for('tailor') }}" id="tailor-form">
+    <input type="hidden" name="profile_json" id="profile-json-field" value="">
     <label class="field">
       <span class="field-label">Paste the job description <em>*</em></span>
       <textarea name="jd" rows="10" required
@@ -173,11 +174,10 @@
   <h3 class="preview-heading">Downloads</h3>
   <div class="download-grid">
     {% for file in result.files %}
-      <a class="download-card"
-         href="{{ url_for('download', token=result.token, filename=file.filename) }}">
+      <a class="download-card" href="{{ file.data_url }}" download="{{ file.filename }}">
         <span class="file-kind kind-{{ file.kind }}">{{ file.kind.upper() }}</span>
         <span class="file-label">{{ file.label }}</span>
-        <span class="file-name">{{ file.filename }}</span>
+        <span class="file-name">{{ file.filename }} · {{ file.size_kb }} KB</span>
       </a>
     {% endfor %}
   </div>
@@ -212,6 +212,9 @@
   const submitBtn = document.getElementById('submit-btn');
   if (form) {
     form.addEventListener('submit', () => {
+      // carry the resume details from section 1 with the request
+      const details = document.querySelector('textarea[name=profile_json]');
+      document.getElementById('profile-json-field').value = details ? details.value : '';
       submitBtn.disabled = true;
       submitBtn.textContent = 'Scoring & tailoring…';
     });
