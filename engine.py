@@ -2,10 +2,14 @@
 # engine.py
 # Orchestrates one tailoring run for the CLI scripts and the
 # web app: loads the profile, scores the JD, reorders content,
-# renders DOCX + PDF outputs and returns everything the UI needs
-# (score, keyword breakdown, before/after preview data).
+# renders DOCX + PDF outputs (in memory) and returns everything
+# the UI needs (score, keyword breakdown, before/after previews).
+#
+# Outputs are bytes, never files on disk — which keeps the app
+# stateless and deployable on Vercel's read-only filesystem.
 # ============================================================
 
+import io
 import json
 import os
 import re
@@ -23,6 +27,11 @@ PROFILE_KEYS = [
     "CERTIFICATIONS", "SKILLS", "EXPERIENCE", "PROJECTS",
     "EDUCATION", "ACHIEVEMENTS", "ACCEPTABLE_ROLE_TITLES",
 ]
+
+MIME_TYPES = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 
 def profile_from_module(module):
@@ -43,6 +52,8 @@ def load_profile():
 
 
 def save_profile(data):
+    """Persist the profile. Raises OSError on read-only filesystems
+    (e.g. Vercel) so callers can degrade gracefully."""
     validate_profile(data)
     with open(PROFILE_PATH, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2, ensure_ascii=False)
@@ -100,6 +111,18 @@ def enrich(profile):
             "EXPERIENCE": experience, "PROJECTS": projects}
 
 
+def _docx_bytes(build_func, *args):
+    buffer = io.BytesIO()
+    build_func(*args).save(buffer)
+    return buffer.getvalue()
+
+
+def _pdf_bytes(render_func, *args):
+    buffer = io.BytesIO()
+    render_func(buffer, *args)
+    return buffer.getvalue()
+
+
 def snapshot(role_title, skills, certs, experience, projects):
     return {
         "role_title": role_title,
@@ -110,12 +133,11 @@ def snapshot(role_title, skills, certs, experience, projects):
     }
 
 
-def run_generation(profile, jd_text, job, out_dir,
-                   cover_letter=True, uae_cover_letter=False):
+def run_generation(profile, jd_text, job, cover_letter=True, uae_cover_letter=False):
     """Tailor resume (+ optional UAE cover letter) for one job.
 
-    Returns a result dict with the ATS report, file list and the
-    before/after snapshots used by the preview panes.
+    Returns a result dict with the ATS report, in-memory file list
+    and the before/after snapshots used by the preview panes.
     """
     jd_lower = jd_text.lower()
     tags = enrich(profile)
@@ -134,35 +156,35 @@ def run_generation(profile, jd_text, job, out_dir,
     name_slug = safe_slug(profile["PERSONAL"].get("name", "Resume").title())
     company_slug = safe_slug(job["company"])
 
-    resume_docx = os.path.join(out_dir, f"{name_slug}_Resume_{company_slug}.docx")
-    resume_pdf = os.path.join(out_dir, f"{name_slug}_Resume_{company_slug}.pdf")
+    resume_docx_name = f"{name_slug}_Resume_{company_slug}.docx"
+    resume_pdf_name = f"{name_slug}_Resume_{company_slug}.pdf"
 
-    core.build_resume_docx(role_title, profile, skills, certs, experience,
-                           projects).save(resume_docx)
-    pdf_reportlab.render_resume_pdf(
-        resume_pdf, role_title, profile, skills, certs, experience, projects)
+    resume_docx = _docx_bytes(core.build_resume_docx, role_title, profile,
+                              skills, certs, experience, projects)
+    resume_pdf = _pdf_bytes(pdf_reportlab.render_resume_pdf, role_title, profile,
+                            skills, certs, experience, projects)
 
     files = [
-        {"label": "Tailored Resume — PDF", "filename": os.path.basename(resume_pdf),
-         "kind": "pdf"},
-        {"label": "Tailored Resume — DOCX", "filename": os.path.basename(resume_docx),
-         "kind": "docx"},
+        {"label": "Tailored Resume — PDF", "filename": resume_pdf_name,
+         "kind": "pdf", "bytes": resume_pdf},
+        {"label": "Tailored Resume — DOCX", "filename": resume_docx_name,
+         "kind": "docx", "bytes": resume_docx},
     ]
 
     if cover_letter:
-        letter_docx = os.path.join(out_dir, f"{name_slug}_Cover_Letter_{company_slug}.docx")
-        letter_pdf = os.path.join(out_dir, f"{name_slug}_Cover_Letter_{company_slug}.pdf")
-        letter_paragraphs = core.build_letter_paragraphs(jd_lower, job, profile)
-        core.build_letter_docx(letter_paragraphs, job, profile,
-                               uae=uae_cover_letter).save(letter_docx)
-        pdf_reportlab.render_letter_pdf(letter_pdf, letter_paragraphs, job,
-                                        profile, uae=uae_cover_letter)
+        letter_docx_name = f"{name_slug}_Cover_Letter_{company_slug}.docx"
+        letter_pdf_name = f"{name_slug}_Cover_Letter_{company_slug}.pdf"
+        paragraphs = core.build_letter_paragraphs(jd_lower, job, profile)
+        letter_docx = _docx_bytes(core.build_letter_docx, paragraphs, job,
+                                  profile, uae_cover_letter)
+        letter_pdf = _pdf_bytes(pdf_reportlab.render_letter_pdf, paragraphs, job,
+                                profile, uae_cover_letter)
         suffix = " (UAE)" if uae_cover_letter else ""
         files += [
-            {"label": f"Cover Letter{suffix} — PDF",
-             "filename": os.path.basename(letter_pdf), "kind": "pdf"},
-            {"label": f"Cover Letter{suffix} — DOCX",
-             "filename": os.path.basename(letter_docx), "kind": "docx"},
+            {"label": f"Cover Letter{suffix} — PDF", "filename": letter_pdf_name,
+             "kind": "pdf", "bytes": letter_pdf},
+            {"label": f"Cover Letter{suffix} — DOCX", "filename": letter_docx_name,
+             "kind": "docx", "bytes": letter_docx},
         ]
 
     baseline = snapshot(

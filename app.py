@@ -9,18 +9,18 @@
 #                         breakdown, BEFORE/AFTER resume preview
 #                         and PDF + DOCX downloads
 #
+# Stateless by design: files are generated in memory and served as
+# data-URL downloads, so it runs on Vercel's read-only filesystem.
+#
 # Run locally:   python3 app.py
 # ============================================================
 
+import base64
 import json
 import os
-import secrets
-import shutil
-import time
 
 from flask import (
-    Flask, abort, flash, redirect, render_template, request,
-    send_from_directory, url_for,
+    Flask, flash, redirect, render_template, request, send_from_directory, url_for,
 )
 
 import engine
@@ -28,27 +28,10 @@ import html_preview
 import parser
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-GENERATED_DIR = os.path.join(BASE_DIR, "generated")
-MAX_AGE_SECONDS = 6 * 60 * 60  # generated files are cleaned after 6 hours
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("BESPOKE_SECRET", "bespoke-dev-secret-key")
-
-
-def _cleanup_old_runs():
-    now = time.time()
-    try:
-        entries = os.listdir(GENERATED_DIR)
-    except FileNotFoundError:
-        return
-    for name in entries:
-        path = os.path.join(GENERATED_DIR, name)
-        try:
-            if now - os.path.getmtime(path) > MAX_AGE_SECONDS:
-                shutil.rmtree(path, ignore_errors=True)
-        except OSError:
-            pass
 
 
 @app.context_processor
@@ -69,6 +52,21 @@ def _render(profile_json=None, result=None, form=None, scroll_result=False):
     )
 
 
+def _profile_from_form(form):
+    """The tailor form carries the profile JSON typed into section 1,
+    so uploads/edits work even where disk persistence is unavailable."""
+    raw = (form.get("profile_json") or "").strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+        engine.validate_profile(data)
+        return data
+    except (ValueError, json.JSONDecodeError) as exc:
+        flash(f"The resume details in section 1 are not valid JSON: {exc}", "error")
+        return False
+
+
 @app.route("/")
 def index():
     return _render()
@@ -81,7 +79,7 @@ def upload():
         flash("Choose a resume file (PDF or DOCX) first.", "error")
         return redirect(url_for("index"))
 
-    ext = os.path.splitext(upload.filename)[1].lower()
+    ext = (os.path.splitext(upload.filename)[1] or "").lower()
     if ext not in ALLOWED_EXTENSIONS:
         flash(f"Unsupported file type '{ext}'. Upload a PDF, DOCX or TXT resume.",
               "error")
@@ -123,6 +121,12 @@ def tailor():
         flash("Add the company name so the files can be named correctly.", "error")
         return _render(form=form)
 
+    profile = _profile_from_form(request.form)
+    if profile is False:
+        return _render(form=form)
+    if profile is None:
+        profile = engine.load_profile()
+
     job = {
         "company": company,
         "role": role or "Security Analyst",
@@ -131,12 +135,8 @@ def tailor():
     }
 
     try:
-        profile = engine.load_profile()
-        token = secrets.token_hex(8)
-        out_dir = os.path.join(GENERATED_DIR, token)
-        os.makedirs(out_dir, exist_ok=True)
         result = engine.run_generation(
-            profile, jd_text, job, out_dir,
+            profile, jd_text, job,
             cover_letter=form["cover_letter"],
             uae_cover_letter=form["cover_letter"],
         )
@@ -145,22 +145,13 @@ def tailor():
         flash(f"Something went wrong while generating: {exc}", "error")
         return _render(form=form)
 
-    result["token"] = token
+    for item in result["files"]:
+        encoded = base64.b64encode(item.pop("bytes")).decode("ascii")
+        item["data_url"] = f"data:{engine.MIME_TYPES[item['kind']]};base64,{encoded}"
+        item["size_kb"] = round(len(encoded) * 3 / 4 / 1024)
+
     result["job"] = job
-    _cleanup_old_runs()
     return _render(result=result, form=form, scroll_result=True)
-
-
-@app.route("/download/<token>/<path:filename>")
-def download(token, filename):
-    if not token.isalnum():
-        abort(404)
-    if os.path.basename(filename) != filename:
-        abort(404)
-    directory = os.path.join(GENERATED_DIR, token)
-    if not os.path.isfile(os.path.join(directory, filename)):
-        abort(404)
-    return send_from_directory(directory, filename, as_attachment=True)
 
 
 @app.route("/api/profile", methods=["POST"])
@@ -168,13 +159,23 @@ def save_profile():
     raw = request.form.get("profile_json", "")
     try:
         data = json.loads(raw)
-        engine.save_profile(data)
+        engine.validate_profile(data)
     except (ValueError, json.JSONDecodeError) as exc:
         flash(f"Could not save the profile: {exc}", "error")
         return _render(profile_json=raw)
 
-    flash("Resume profile saved. New applications will use this content.", "success")
-    return _render()
+    try:
+        engine.save_profile(data)
+        flash("Resume profile saved. New applications will use this content.",
+              "success")
+        return _render()
+    except OSError:
+        # Read-only filesystem (e.g. hosted on Vercel): the details live in
+        # the editor and travel with each Tailor request instead.
+        flash("This hosting has read-only storage, so the profile is kept in the "
+              "details box and reused automatically when you press Tailor. "
+              "(Locally it would be saved to profile.json.)", "success")
+        return _render(profile_json=raw)
 
 
 @app.route("/api/profile/reset", methods=["POST"])
@@ -183,7 +184,11 @@ def reset_profile():
         os.remove(engine.PROFILE_PATH)
         flash("Reverted to the content in resume_data.py.", "success")
     except FileNotFoundError:
-        flash("No custom profile was stored — already using resume_data.py.", "success")
+        flash("No custom profile was stored — already using resume_data.py.",
+              "success")
+    except OSError:
+        flash("Read-only storage here — just clear the details box to start over.",
+              "success")
     return _render()
 
 
@@ -193,6 +198,5 @@ def branding_logo():
 
 
 if __name__ == "__main__":
-    os.makedirs(GENERATED_DIR, exist_ok=True)
     port = int(os.environ.get("PORT", "8000"))
     app.run(host="0.0.0.0", port=port, debug=False)

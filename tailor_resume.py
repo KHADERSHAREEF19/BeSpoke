@@ -41,14 +41,16 @@ def main():
         "why_company": WHY_COMPANY,
     }
 
-    out_dir = tempfile.mkdtemp(prefix="bespoke_")
-    result = run_generation(profile, jd_text, job, out_dir, cover_letter=False)
+    result = run_generation(profile, jd_text, job, cover_letter=False)
     print_report(result["report"])
 
+    out_dir = tempfile.mkdtemp(prefix="bespoke_")
     print(f"\nDetected role title: {result['role_title']}")
-    print(f"Saved to: {out_dir}")
     for item in result["files"]:
-        print(f"  • {item['label']}")
+        path = os.path.join(out_dir, item["filename"])
+        with open(path, "wb") as handle:
+            handle.write(item["bytes"])
+        print(f"  • {item['label']} → {path}")
     print("\nOpen both, compare with your approved resume, then send the PDF.")
 
 
