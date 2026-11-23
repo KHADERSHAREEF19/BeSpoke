@@ -23,6 +23,9 @@ from flask import (
     Flask, flash, redirect, render_template, request, send_from_directory, url_for,
 )
 
+import ats
+import core
+import docx_edit
 import engine
 import html_preview
 import parser
@@ -152,6 +155,105 @@ def tailor():
 
     result["job"] = job
     return _render(result=result, form=form, scroll_result=True)
+
+
+@app.route("/tailor_edit", methods=["POST"])
+def tailor_edit():
+    """Edit the user's ORIGINAL uploaded DOCX in place — layout-preserving."""
+    jd_text = request.form.get("jd", "").strip()
+    company = request.form.get("company", "").strip()
+    role = request.form.get("role", "").strip()
+
+    form = {
+        "jd": jd_text,
+        "company": company,
+        "role": role,
+        "hiring_manager": request.form.get("hiring_manager", "").strip(),
+        "why_company": request.form.get("why_company", "").strip(),
+        "cover_letter": request.form.get("cover_letter") == "yes",
+    }
+
+    if len(jd_text) < 50:
+        flash("Paste the full job description (at least a few sentences).", "error")
+        return _render(form=form)
+    if not company:
+        flash("Add the company name so the files can be named correctly.", "error")
+        return _render(form=form)
+
+    upload = request.files.get("resume_file")
+    if upload is None or not upload.filename:
+        flash("For in-place editing, choose the DOCX version of your resume "
+              "(the file picker in section 1).", "error")
+        return _render(form=form)
+    ext = (os.path.splitext(upload.filename)[1] or "").lower()
+    if ext != ".docx":
+        flash("In-place editing needs your editable .docx file (not a PDF). "
+              "Upload the DOCX source of your resume.", "error")
+        return _render(form=form)
+
+    profile = _profile_from_form(request.form)
+    if profile is False:
+        return _render(form=form)
+    if profile is None:
+        profile = engine.load_profile()
+
+    job = {
+        "company": company,
+        "role": role or "Security Analyst",
+        "hiring_manager": form["hiring_manager"] or "Hiring Manager",
+        "why_company": form["why_company"],
+    }
+
+    new_title = core.detect_role_title(jd_text.lower(), profile)
+    try:
+        edited, changes = docx_edit.tailor_document(
+            upload.read(), jd_text,
+            old_title=profile["PERSONAL"].get("role_label", ""),
+            new_title=new_title,
+        )
+    except Exception as exc:
+        app.logger.exception("in-place edit failed")
+        flash(f"Could not edit that document: {exc}", "error")
+        return _render(form=form)
+
+    report = ats.score(jd_text, profile)
+
+    name_slug = engine.safe_slug(profile["PERSONAL"].get("name", "Resume").title())
+    company_slug = engine.safe_slug(company)
+
+    files = [{
+        "label": "Your resume — edited in place (DOCX, exact layout)",
+        "filename": f"{name_slug}_Resume_{company_slug}_Edited.docx",
+        "kind": "docx",
+        "bytes": edited,
+    }]
+
+    # Optional BeSpoke-style versions (cover letter is text-based and safe).
+    try:
+        extra = engine.run_generation(
+            profile, jd_text, job,
+            cover_letter=form["cover_letter"],
+            uae_cover_letter=form["cover_letter"],
+        )
+        for item in extra["files"]:
+            item["label"] = "BeSpoke-style " + item["label"]
+            files.append(item)
+    except Exception:
+        app.logger.exception("optional rebuild failed")
+
+    for item in files:
+        encoded = base64.b64encode(item.pop("bytes")).decode("ascii")
+        item["data_url"] = f"data:{engine.MIME_TYPES[item['kind']]};base64,{encoded}"
+        item["size_kb"] = round(len(encoded) * 3 / 4 / 1024)
+
+    return _render(result={
+        "mode": "edit",
+        "report": report,
+        "files": files,
+        "changes": changes,
+        "role_title": new_title,
+        "job": job,
+    }, form=form, scroll_result=True)
 
 
 @app.route("/api/profile", methods=["POST"])

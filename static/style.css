@@ -271,3 +271,16 @@ code { background: var(--card-2); padding: 1px 6px; border-radius: 6px; font-siz
 .cat-count { width: 38px; text-align: right; }
 
 .preview-heading { margin: 22px 0 4px; }
+
+/* Mode radios */
+.mode-row { display: grid; gap: 10px; margin-bottom: 14px; }
+.mode { display: flex; gap: 10px; align-items: flex-start; background: var(--card-2);
+        border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+        cursor: pointer; }
+.mode input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--teal); }
+.mode span { font-size: 0.9rem; color: var(--muted); }
+.mode strong { color: var(--text); }
+
+/* Change list (edit-in-place results) */
+.change-list { margin: 8px 0 4px; padding-left: 22px; }
+.change-list li { margin-bottom: 6px; color: var(--text); font-size: 0.95rem; }

@@ -9,10 +9,22 @@
 
 ## ✨ How it works — 3 sections on one page
 
+**Two tailoring modes**
+
+- **Edit my uploaded resume in place (recommended)** — upload the **DOCX source**
+  of your resume. BeSpoke edits *that exact file*: it reorders your real bullet
+  points by JD relevance and swaps the header role title. Your photo, colors,
+  fonts, margins and one-page pagination stay exactly as they are. Downloads:
+  the edited DOCX (+ optional BeSpoke-style extras). Open the DOCX in Word /
+  LibreOffice / Google Docs → *Save as PDF* for a pixel-identical PDF.
+- **Rebuild in BeSpoke style** — regenerates a clean one-page resume from your
+  structured details. Layout will differ from your original document.
+
 **1 · Your resume** — upload your default resume (PDF / DOCX / TXT). BeSpoke reads
 it and fills in all your details; review them and press *Save profile*. You can
 also edit the JSON directly, or just keep the built-in content from
-`resume_data.py`.
+`resume_data.py`. For in-place editing use the DOCX version so the layout is
+preserved.
 
 **2 · Job description** — paste the full JD, company, role, hiring manager and a
 genuine "why this company". Tick **"Generate a UAE cover letter"** only if you

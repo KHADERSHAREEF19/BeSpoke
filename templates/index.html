@@ -27,7 +27,7 @@
   <form class="upload-row" method="post" action="{{ url_for('upload') }}"
         enctype="multipart/form-data">
     <label class="file-picker">
-      <input type="file" name="resume_file" accept=".pdf,.docx,.txt">
+      <input type="file" name="resume_file" id="resume-file-input" accept=".pdf,.docx,.txt">
       <span id="file-name">Choose resume file…</span>
     </label>
     <button class="btn btn-ghost" type="submit">Upload &amp; refill my details</button>
@@ -82,6 +82,20 @@
         <span class="field-label">Why this company <small>(for the cover letter)</small></span>
         <textarea name="why_company" rows="2"
           placeholder="1–2 genuine sentences, in your own words.">{{ form.get('why_company', '') }}</textarea>
+      </label>
+    </div>
+
+    <div class="mode-row">
+      <label class="mode">
+        <input type="radio" name="mode" value="edit" checked>
+        <span><strong>Edit my uploaded resume in place</strong> — keeps your photo,
+          colors, fonts and one-page layout. Only your real bullet order and the header
+          role title change.</span>
+      </label>
+      <label class="mode">
+        <input type="radio" name="mode" value="rebuild">
+        <span><strong>Rebuild in BeSpoke style</strong> — regenerates a clean resume
+          from your details. Layout will differ from your original.</span>
       </label>
     </div>
 
@@ -157,6 +171,21 @@
     <p class="hint">Only add a missing keyword if you genuinely have that skill.</p>
   </div>
 
+  {% if result.mode == "edit" %}
+  <h3 class="preview-heading">What changed in your document</h3>
+  <p class="hint">Your file was edited in place — photo, colors, fonts, margins and
+    pagination are untouched. Here is exactly what moved:</p>
+  <ul class="change-list">
+    {% for change in result.changes %}
+      <li>{{ change }}</li>
+    {% else %}
+      <li>No bullet reordering was needed for this JD; your content already led
+        with the most relevant points.</li>
+    {% endfor %}
+  </ul>
+  <p class="hint"><strong>Tip:</strong> open the edited DOCX in Word / LibreOffice /
+    Google Docs and use “Save as PDF” to export a pixel-identical PDF.</p>
+  {% else %}
   <h3 class="preview-heading">Resume — before vs after</h3>
   <p class="hint">Same fonts, same margins, same layout. Only the order of your real
     content (and the header role title) changes.</p>
@@ -170,6 +199,7 @@
       <div class="pv-scroll">{{ result.preview_after | safe }}</div>
     </div>
   </div>
+  {% endif %}
 
   <h3 class="preview-heading">Downloads</h3>
   <div class="download-grid">
@@ -211,10 +241,45 @@
   const form = document.getElementById('tailor-form');
   const submitBtn = document.getElementById('submit-btn');
   if (form) {
-    form.addEventListener('submit', () => {
+    form.addEventListener('submit', async (event) => {
       // carry the resume details from section 1 with the request
       const details = document.querySelector('textarea[name=profile_json]');
-      document.getElementById('profile-json-field').value = details ? details.value : '';
+      const hiddenField = document.getElementById('profile-json-field');
+      if (details && hiddenField) hiddenField.value = details.value;
+
+      const mode = form.querySelector('input[name=mode]:checked');
+      const file = document.getElementById('resume-file-input')
+        ? document.getElementById('resume-file-input').files[0] : null;
+
+      if (mode && mode.value === 'edit') {
+        if (!file) {
+          event.preventDefault();
+          alert('For in-place editing, pick your resume DOCX in section 1 first.');
+          return;
+        }
+        event.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Editing your document…';
+        const payload = new FormData(form);
+        payload.append('resume_file', file);
+        try {
+          const response = await fetch('/tailor_edit', { method: 'POST', body: payload });
+          const html = await response.text();
+          document.open();
+          document.write(html);
+          document.close();
+          setTimeout(() => {
+            const target = document.getElementById('section-result');
+            if (target) target.scrollIntoView({ behavior: 'smooth' });
+          }, 60);
+        } catch (error) {
+          alert('Could not reach the server: ' + error);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Tailor my application';
+        }
+        return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.textContent = 'Scoring & tailoring…';
     });
