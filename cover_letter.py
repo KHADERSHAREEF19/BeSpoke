@@ -31,7 +31,8 @@ def main():
     }
 
     out_dir = tempfile.mkdtemp(prefix="bespoke_letter_")
-    result = run_generation(profile, jd_text, job, out_dir)
+    result = run_generation(profile, jd_text, job, out_dir,
+                            cover_letter=True, uae_cover_letter=True)
 
     print(f"Cover letter generated for {COMPANY} — {ROLE}")
     for item in result["files"]:

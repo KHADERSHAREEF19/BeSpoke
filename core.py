@@ -450,14 +450,16 @@ def build_letter_paragraphs(jd_lower, job, profile):
             "the tools your team uses."
         )
 
+    why = job.get("why_company", "").strip()
+    closing = (why + " ") if why else ""
     paragraphs.append(
-        f"{job['why_company'].strip()} I would welcome the opportunity to discuss how I can "
+        f"{closing}I would welcome the opportunity to discuss how I can "
         "contribute to your security team. Thank you for your time and consideration."
     )
     return paragraphs
 
 
-def build_letter_docx(paragraphs, job, profile):
+def build_letter_docx(paragraphs, job, profile, uae=False):
     doc = Document()
     sec = doc.sections[0]
     sec.page_width, sec.page_height = Mm(210), Mm(297)
@@ -492,6 +494,8 @@ def build_letter_docx(paragraphs, job, profile):
 
     line(datetime.date.today().strftime("%d %B %Y"))
     line(f"{job['hiring_manager']}\n{job['company']}")
+    if uae:
+        line(f"Subject: Application for {job['role']} — {job['company']}", bold=True, after=8)
     line(f"Dear {job['hiring_manager']},")
     for para in paragraphs:
         line(para)

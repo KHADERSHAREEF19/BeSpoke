@@ -42,7 +42,7 @@ def main():
     }
 
     out_dir = tempfile.mkdtemp(prefix="bespoke_")
-    result = run_generation(profile, jd_text, job, out_dir)
+    result = run_generation(profile, jd_text, job, out_dir, cover_letter=False)
     print_report(result["report"])
 
     print(f"\nDetected role title: {result['role_title']}")

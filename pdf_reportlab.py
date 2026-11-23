@@ -158,7 +158,7 @@ def render_resume_pdf(path, role_title, profile, skills_dict, certs, experience,
     doc.build(story)
 
 
-def render_letter_pdf(path, paragraphs, job, profile):
+def render_letter_pdf(path, paragraphs, job, profile, uae=False):
     styles = _styles()
     doc = SimpleDocTemplate(
         path, pagesize=A4,
@@ -185,6 +185,10 @@ def render_letter_pdf(path, paragraphs, job, profile):
     import datetime
     story.append(Paragraph(datetime.date.today().strftime("%d %B %Y"), styles["body"]))
     story.append(Paragraph(f"{job['hiring_manager']}<br/>{job['company']}", styles["body"]))
+    if uae:
+        story.append(Paragraph(
+            f"<b>Subject: Application for {job['role']} — {job['company']}</b>",
+            styles["body"]))
     story.append(Paragraph(f"Dear {job['hiring_manager']},", styles["body"]))
     for para in paragraphs:
         story.append(Paragraph(para, styles["body"]))
