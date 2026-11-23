@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <h1>Tailor your resume to <span class="accent">every job</span></h1>
+  <p class="sub">
+    Paste a job description. BeSpoke reorders your real experience by relevance,
+    scores the ATS keyword overlap, and produces a tailored resume and cover letter.
+  </p>
+</section>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="generate" type="button">Generate application</button>
+  <button class="tab" data-tab="profile" type="button">Resume profile</button>
+</nav>
+
+<section id="tab-generate" class="card">
+  <form method="post" action="{{ url_for('generate') }}" id="tailor-form">
+    <label class="field">
+      <span class="field-label">Job description <em>*</em></span>
+      <textarea name="jd" rows="12" required
+        placeholder="Paste the full posting text here — responsibilities, requirements, skills…">{{ request.form.get('jd', '') }}</textarea>
+    </label>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Company <em>*</em></span>
+        <input type="text" name="company" required
+               value="{{ request.form.get('company', '') }}"
+               placeholder="e.g. Amazon">
+      </label>
+      <label class="field">
+        <span class="field-label">Role title from the posting</span>
+        <input type="text" name="role"
+               value="{{ request.form.get('role', '') }}"
+               placeholder="e.g. SOC Analyst">
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Hiring manager</span>
+        <input type="text" name="hiring_manager"
+               value="{{ request.form.get('hiring_manager', '') }}"
+               placeholder="Name if the posting gives one">
+      </label>
+      <label class="field">
+        <span class="field-label">Why this company <small>(1–2 genuine sentences)</small></span>
+        <textarea name="why_company" rows="2"
+          placeholder="Write this yourself — it goes straight into the cover letter.">{{ request.form.get('why_company', '') }}</textarea>
+      </label>
+    </div>
+
+    <button class="btn btn-primary" type="submit" id="submit-btn">
+      Tailor my application
+    </button>
+    <p class="hint">Outputs: tailored resume + cover letter, each as PDF and DOCX, plus an ATS keyword report.</p>
+  </form>
+</section>
+
+<section id="tab-profile" class="card hidden">
+  <form method="post" action="{{ url_for('save_profile') }}">
+    <label class="field">
+      <span class="field-label">Your resume content (JSON)</span>
+      <textarea name="profile_json" rows="26" class="mono" spellcheck="false">{{ profile_json }}</textarea>
+    </label>
+    <div class="row">
+      <button class="btn btn-primary" type="submit">Save profile</button>
+      <button class="btn btn-ghost" type="submit" formaction="{{ url_for('reset_profile') }}"
+              formmethod="post">Reset to resume_data.py</button>
+    </div>
+    <p class="hint">
+      Saving writes <code>profile.json</code>, which overrides <code>resume_data.py</code>
+      for every run. Keep the same keys and structure.
+    </p>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.toggle('active', t === tab));
+      document.getElementById('tab-generate').classList.toggle('hidden', tab.dataset.tab !== 'generate');
+      document.getElementById('tab-profile').classList.toggle('hidden', tab.dataset.tab !== 'profile');
+    });
+  });
+
+  const form = document.getElementById('tailor-form');
+  const submitBtn = document.getElementById('submit-btn');
+  form.addEventListener('submit', () => {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Tailoring… this takes a few seconds';
+  });
+</script>
+{% endblock %}

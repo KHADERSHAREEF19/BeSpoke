@@ -11,3 +11,8 @@ venv/
 *.pdf
 Khader_Shareef_*.pdf
 Khader_Shareef_*.docx
+generated/
+bespoke_*/
+
+# Web-editable resume profile (overrides resume_data.py locally)
+profile.json

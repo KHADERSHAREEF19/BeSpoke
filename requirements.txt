@@ -1,2 +1,7 @@
-python-docx
-docx2pdf
+# BeSpoke dependencies
+python-docx   # DOCX resume + cover letter
+reportlab     # PDF rendering (pure Python — no LibreOffice/Word needed)
+flask         # web app (app.py)
+
+# Optional, only for the legacy pdf_export.py path:
+# docx2pdf    # Windows/macOS only, requires Microsoft Word installed
