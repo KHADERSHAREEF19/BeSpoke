@@ -2,50 +2,68 @@
 
 ## 🎯 BeSpoke: Resume Tailoring System
 
-> Automatically tailor your resume and generate cover letters for job applications with ATS keyword matching.
+> One page. Upload your resume, paste a job description, get an accurate ATS
+> match score, a before/after preview, and tailored PDF + DOCX downloads.
 
 ---
 
-## ✨ Features
+## ✨ How it works — 3 sections on one page
 
-✅ **Smart Resume Tailoring** — Reorder bullets by job relevance  
-✅ **ATS Keyword Matching** — See which skills match the job  
-✅ **Auto Cover Letters** — Generate professional letters instantly  
-✅ **Dual Output** — DOCX + PDF formats  
-✅ **Honest Reporting** — Never invents skills  
+**1 · Your resume** — upload your default resume (PDF / DOCX / TXT). BeSpoke reads
+it and fills in all your details; review them and press *Save profile*. You can
+also edit the JSON directly, or just keep the built-in content from
+`resume_data.py`.
+
+**2 · Job description** — paste the full JD, company, role, hiring manager and a
+genuine "why this company". Tick **"Generate a UAE cover letter"** only if you
+want one (no watermark); leave it unticked and you get only the tailored resume.
+
+**3 · Match & preview** — instantly get:
+- 🎯 **Weighted ATS match score** with per-category breakdown bars
+- ✅ / ❌ matched vs missing keyword chips
+- 👀 **Before vs After** resume panes (same fonts, margins and layout — only the
+  order of your real content changes)
+- ⬇️ Downloads: tailored resume **PDF + DOCX**, plus the optional UAE cover
+  letter **PDF + DOCX**
 
 ---
 
-## 📦 Installation
+## 🧠 The score
+
+No external API and no hidden service: `ats.py` runs locally and deterministically.
+
+1. Scans the JD against a curated security-domain concept dictionary
+   (SOC/SIEM/IAM/cloud/network/GRC/tools/certs/soft skills) with synonyms,
+   abbreviations and plural handling.
+2. Weights core concepts higher and rewards repeated mentions.
+3. Score = weighted coverage = matched weight ÷ total JD weight.
+4. It also extracts any "N+ years" requirement from the posting.
+
+This is a **keyword-coverage estimate**, not a secret vendor algorithm — but it is
+far closer than raw word matching, and it flags exactly which gaps cost you points.
+
+---
+
+## 🌐 Run it
 
 ```bash
-pip install python-docx docx2pdf
+pip install -r requirements.txt
+python3 app.py          # → http://localhost:8000
 ```
 
-**For PDF export, install LibreOffice:**
-- [Download here](https://www.libreoffice.org/download/)
+Uploaded resumes are parsed by `parser.py`; reordering works on uploaded content
+too (concepts are auto-tagged from the same dictionary).
 
 ---
 
-## 🚀 Quick Start
+## 🖥️ Command line (optional)
 
-**Step 1:** Edit `resume_data.py` with your information
-
-**Step 2:** Paste job description into `job_description.txt`
-
-**Step 3:** Fill in `job_details.py`:
-```python
-COMPANY = "Company Name"
-ROLE = "Job Title"
-HIRING_MANAGER = "Manager Name"
-WHY_COMPANY = "Why you want this job"
-```
-
-**Step 4:** Generate files
 ```bash
-python tailor_resume.py    # → Resume PDF + ATS report
-python cover_letter.py     # → Cover Letter PDF
+python3 tailor_resume.py    # resume PDF + DOCX + ATS report
+python3 cover_letter.py     # adds a UAE cover letter (edit job_details.py first)
 ```
+
+Both CLIs share the exact same engine as the web app.
 
 ---
 
@@ -53,30 +71,24 @@ python cover_letter.py     # → Cover Letter PDF
 
 | File | Purpose |
 |------|---------|
-| `resume_data.py` | Your resume data (edit once) |
-| `job_details.py` | Job-specific info (local) |
-| `job_description.txt` | Paste JD here (local) |
-| `tailor_resume.py` | Main resume script |
-| `cover_letter.py` | Cover letter generator |
-| `pdf_export.py` | PDF converter |
-
----
-
-## ⚙️ How It Works
-
-1. 📖 Reads job description
-2. 🎯 Detects best role title
-3. 🔄 Reorders bullets by relevance
-4. 📊 Generates ATS keyword report
-5. 📄 Outputs DOCX + PDF
+| `app.py` | Flask single-page web app |
+| `engine.py` | Orchestration, profile loading, keyword auto-tagging |
+| `core.py` | Reordering + DOCX renderers |
+| `ats.py` | Weighted ATS matcher + concept dictionary |
+| `parser.py` | Resume upload → structured profile |
+| `html_preview.py` | Before/after HTML resume rendering |
+| `pdf_reportlab.py` | Pure-Python PDF rendering |
+| `resume_data.py` | Built-in resume data |
+| `job_details.py` / `job_description.txt` | Inputs for the CLI |
 
 ---
 
 ## ⚠️ Important
 
-- **ATS score** = estimate for THIS job only
-- **Never add** skills you don't have
-- **Always edit** the cover letter before sending
+- **Always read** the generated documents before sending.
+- **Never add** keywords you don't genuinely have — BeSpoke reorders real content
+  only, and so should you.
+- Files land in `generated/` and are auto-cleaned after 6 hours.
 
 ---
 
@@ -87,4 +99,3 @@ python cover_letter.py     # → Cover Letter PDF
 📧 [infa.khadershareef@gmail.com](mailto:infa.khadershareef@gmail.com)  
 🔗 [LinkedIn: Khader Shareef](https://linkedin.com/in/khader-shareef-madani-129167260)  
 🌐 [Khader.dev](https://khadershareef19.vercel.app)
-

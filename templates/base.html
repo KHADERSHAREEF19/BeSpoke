@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}BeSpoke — Resume Tailoring System{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('branding_logo') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">
+      <img src="{{ url_for('branding_logo') }}" alt="BeSpoke logo" class="brand-logo">
+      <span class="brand-name">BeSpoke</span>
+    </a>
+    <span class="brand-tag">Resume Tailoring System</span>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>Honest tailoring only — BeSpoke reorders your real experience, it never invents skills.</p>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

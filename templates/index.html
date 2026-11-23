@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}BeSpoke — Tailor your resume to any job{% endblock %}
+
+{% block content %}
+<style>{{ preview_css }}</style>
+
+<nav class="steps">
+  <a class="step" href="#section-resume"><span class="step-num">1</span> Your resume</a>
+  <a class="step" href="#section-job"><span class="step-num">2</span> Job description</a>
+  <a class="step" href="#section-result"><span class="step-num">3</span> Match &amp; preview</a>
+</nav>
+
+<!-- ================= SECTION 1 : RESUME ================= -->
+<section id="section-resume" class="card">
+  <div class="card-head">
+    <h2>1 · Your resume</h2>
+    <div class="profile-chips">
+      <span class="pchip">{{ profile.PERSONAL.get('name', '—') }}</span>
+      <span class="pchip">{{ profile.PERSONAL.get('role_label', '') }}</span>
+      <span class="pchip">{{ profile.EXPERIENCE|length }} roles</span>
+      <span class="pchip">{{ profile.SKILLS|length }} skill groups</span>
+      <span class="pchip">{{ profile.CERTIFICATIONS|length }} certifications</span>
+      {% if profile.PERSONAL.get('uae_phone') %}<span class="pchip">UAE number on file</span>{% endif %}
+    </div>
+  </div>
+
+  <form class="upload-row" method="post" action="{{ url_for('upload') }}"
+        enctype="multipart/form-data">
+    <label class="file-picker">
+      <input type="file" name="resume_file" accept=".pdf,.docx,.txt">
+      <span id="file-name">Choose resume file…</span>
+    </label>
+    <button class="btn btn-ghost" type="submit">Upload &amp; refill my details</button>
+  </form>
+  <p class="hint">PDF, DOCX or TXT. BeSpoke reads it and fills the fields below —
+     review them, then save. Nothing is uploaded anywhere else.</p>
+
+  <form method="post" action="{{ url_for('save_profile') }}" class="mt">
+    <label class="field">
+      <span class="field-label">Your details (JSON)</span>
+      <textarea name="profile_json" rows="20" class="mono" spellcheck="false">{{ profile_json }}</textarea>
+    </label>
+    <div class="row">
+      <button class="btn btn-primary" type="submit">Save profile</button>
+      <button class="btn btn-ghost" type="submit" formaction="{{ url_for('reset_profile') }}"
+              formmethod="post">Reset to resume_data.py</button>
+    </div>
+  </form>
+</section>
+
+<!-- ================= SECTION 2 : JOB ================= -->
+<section id="section-job" class="card">
+  <div class="card-head"><h2>2 · Job description</h2></div>
+  <form method="post" action="{{ url_for('tailor') }}" id="tailor-form">
+    <label class="field">
+      <span class="field-label">Paste the job description <em>*</em></span>
+      <textarea name="jd" rows="10" required
+        placeholder="Full posting text — responsibilities, requirements, nice-to-haves…">{{ form.get('jd', '') }}</textarea>
+    </label>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Company <em>*</em></span>
+        <input type="text" name="company" required value="{{ form.get('company', '') }}"
+               placeholder="e.g. Amazon">
+      </label>
+      <label class="field">
+        <span class="field-label">Role title from the posting</span>
+        <input type="text" name="role" value="{{ form.get('role', '') }}"
+               placeholder="e.g. SOC Analyst">
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Hiring manager</span>
+        <input type="text" name="hiring_manager" value="{{ form.get('hiring_manager', '') }}"
+               placeholder="Name if the posting gives one">
+      </label>
+      <label class="field">
+        <span class="field-label">Why this company <small>(for the cover letter)</small></span>
+        <textarea name="why_company" rows="2"
+          placeholder="1–2 genuine sentences, in your own words.">{{ form.get('why_company', '') }}</textarea>
+      </label>
+    </div>
+
+    <label class="check">
+      <input type="checkbox" name="cover_letter" value="yes"
+             {% if form.get('cover_letter') %}checked{% endif %}>
+      <span><strong>Generate a UAE cover letter</strong> — clean, no watermark.
+        Leave unchecked and you will get only the tailored resume (PDF + DOCX).</span>
+    </label>
+
+    <button class="btn btn-primary btn-lg" type="submit" id="submit-btn">
+      Tailor my application
+    </button>
+    <p class="hint">You will get the ATS match score, a before/after preview and the
+      downloadable files in section 3.</p>
+  </form>
+</section>
+
+<!-- ================= SECTION 3 : RESULT ================= -->
+{% if result %}
+<section id="section-result" class="card">
+  <div class="results-head">
+    <div>
+      <p class="eyebrow">Tailored for</p>
+      <h2 class="result-title">{{ result.job.role }} <span class="accent">@ {{ result.job.company }}</span></h2>
+      <p class="sub">Resume header shows: <strong>{{ result.role_title }}</strong></p>
+    </div>
+    <div class="score-ring" style="--pct: {{ result.report.score }}">
+      <span class="score-value">{{ result.report.score }}%</span>
+      <span class="score-label">weighted match</span>
+    </div>
+  </div>
+
+  <p class="hint">
+    {{ result.report.matched_count }} of {{ result.report.concept_count }} tracked concepts from
+    this JD appear in your resume.
+    {% if result.report.years_required %}
+      The JD asks for <strong>{{ result.report.years_required }}+ years</strong> of experience.
+    {% endif %}
+  </p>
+
+  <div class="cat-bars">
+    {% for category, vals in result.report.by_category.items() %}
+      <div class="cat-bar" title="{{ vals.matched }} / {{ vals.total }} matched">
+        <span class="cat-name">{{ category }}</span>
+        <span class="bar"><span class="bar-fill"
+              style="width: {{ (vals.matched / vals.total * 100)|round }}"></span></span>
+        <span class="cat-count">{{ vals.matched }}/{{ vals.total }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="chip-block">
+    <h3 class="chip-title ok">Matched in your resume</h3>
+    <div class="chips">
+      {% for concept in result.report.matched %}
+        <span class="chip chip-ok" title="{{ concept.category }}">✓ {{ concept.name }}</span>
+      {% else %}
+        <span class="hint">No tracked concepts matched yet.</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="chip-block">
+    <h3 class="chip-title miss">In the JD but not in your resume</h3>
+    <div class="chips">
+      {% for concept in result.report.missing %}
+        <span class="chip chip-miss" title="{{ concept.category }}">✗ {{ concept.name }}</span>
+      {% else %}
+        <span class="hint">No tracked gaps found.</span>
+      {% endfor %}
+    </div>
+    <p class="hint">Only add a missing keyword if you genuinely have that skill.</p>
+  </div>
+
+  <h3 class="preview-heading">Resume — before vs after</h3>
+  <p class="hint">Same fonts, same margins, same layout. Only the order of your real
+    content (and the header role title) changes.</p>
+  <div class="pv-wrap">
+    <div class="pv-pane pv-before">
+      <div class="pv-pane-head">Before — your resume</div>
+      <div class="pv-scroll">{{ result.preview_before | safe }}</div>
+    </div>
+    <div class="pv-pane pv-after">
+      <div class="pv-pane-head">After — tailored to this JD</div>
+      <div class="pv-scroll">{{ result.preview_after | safe }}</div>
+    </div>
+  </div>
+
+  <h3 class="preview-heading">Downloads</h3>
+  <div class="download-grid">
+    {% for file in result.files %}
+      <a class="download-card"
+         href="{{ url_for('download', token=result.token, filename=file.filename) }}">
+        <span class="file-kind kind-{{ file.kind }}">{{ file.kind.upper() }}</span>
+        <span class="file-label">{{ file.label }}</span>
+        <span class="file-name">{{ file.filename }}</span>
+      </a>
+    {% endfor %}
+  </div>
+  <p class="hint">Read every document before sending, and edit anything that does not
+    sound like you. DOCX keeps your editable styling; the PDF is generated by BeSpoke's
+    built-in renderer in the same layout for both versions.</p>
+
+  <a class="btn btn-primary" href="#section-job">Tailor another job</a>
+</section>
+{% else %}
+<section id="section-result" class="card result-placeholder">
+  <h2>3 · Match &amp; preview</h2>
+  <p class="hint">Fill in the job description above and press
+    <strong>Tailor my application</strong> — your weighted ATS score,
+    before/after resume preview and downloads will appear here.</p>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Show the chosen file's name next to the upload button.
+  const picker = document.querySelector('.file-picker input[type=file]');
+  const fileName = document.getElementById('file-name');
+  if (picker) {
+    picker.addEventListener('change', () => {
+      fileName.textContent = picker.files.length ? picker.files[0].name : 'Choose resume file…';
+    });
+  }
+
+  const form = document.getElementById('tailor-form');
+  const submitBtn = document.getElementById('submit-btn');
+  if (form) {
+    form.addEventListener('submit', () => {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Scoring & tailoring…';
+    });
+  }
+
+  {% if scroll_result %}
+    window.addEventListener('load', () => {
+      document.getElementById('section-result').scrollIntoView({ behavior: 'smooth' });
+    });
+  {% endif %}
+</script>
+{% endblock %}
